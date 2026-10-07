@@ -23,9 +23,22 @@ def im2col_manual_jax(x, KH, KW, S, P, out_h, out_w):
 
     # TO DO: Convert input (x) into shape (N, out_h*out_w, C*KH*KW). 
     # Refer to Lecture 3 for implementing this operation.
-    
-    # patches = ...
-    # return patches
+
+    patches = jnp.zeros((N, out_h * out_w, C * KH * KW), dtype=x.dtype)
+
+    for h in range(out_h):
+        for w in range(out_w):
+            patch = x_pad[
+                :, # the whole batch
+                :, # all colors
+                h*S:h*S+KH,
+                w*S:w*S+KW
+            ]
+
+            patches = patches.at[:, h*out_w + w, :].set(patch.reshape(N, C * KH * KW))
+                    
+    return patches
+
 
 def conv2d_manual_jax(x, weight, bias, stride=1, padding=1):
     '''
@@ -37,21 +50,25 @@ def conv2d_manual_jax(x, weight, bias, stride=1, padding=1):
     C_out, _, KH, KW = weight.shape
 
     # define your helper variables here
-    # out_h = ...
-    # out_w = ...
+    out_h = 1 + (H + 2 * padding - KH) // stride
+    out_w = 1 + (W + 2 * padding - KW) // stride
     
     # TO DO: 1) convert input (x) into shape (N, out_h*out_w, C*KH*KW).
-    # cols = im2col_manual_jax(x, KH, KW, stride, padding, out_h, out_w)
+    cols = im2col_manual_jax(x, KH, KW, stride, padding, out_h, out_w)
 
     # TO DO: 2) flatten self.weight into shape (C_out, C*KH*KW).
+    w = weight.reshape(C_out, C*KH*KW)
 
     # TO DO: 3) perform tiled matmul after required reshaping is done.
+    out = jnp.matmul(cols, w.T)
 
     # TO DO: 4) Add bias.
+    out += bias
 
     # TO DO: 5) reshape output into shape (N, C_out, out_h, out_w).
+    out = jnp.swapaxes(out, 1, 2).reshape(N, C_out, out_h, out_w)
 
-    #return out
+    return out
 
 if __name__ == "__main__":
     # Instantiate PyTorch model
