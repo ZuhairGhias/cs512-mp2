@@ -66,10 +66,36 @@ def conv2d(X, W, bias):
     c_in_pmax = nl.tile_size.pmax
     n_tiles_c_in = in_channels // c_in_pmax
 
+    TILE = nl.tile_size.pmax
+
     # Process the images in batches
     for b in nl.affine_range(batch_size):
-        raise RuntimeError("Please fill your implementation of computing convolution"
-                           " of X[b] with the weights W and bias b and store the result in X_out[b]")
+        for out_c in nl.affine_range(out_channels // TILE):
+            out_start = out_c * TILE
+            out_end = out_start + TILE
 
+            bias_tile = nl.load(bias[out_start:out_end]).reshape((TILE,1))
+
+            for h in nl.affine_range(out_height):
+                sum = nl.zeros((TILE, out_width), dtype=nl.float32, buffer=nl.psum,)
+
+                for in_c in nl.affine_range(in_channels // TILE):
+                    in_start = in_c * TILE
+                    in_end = in_start + TILE
+                    weight_block = nl.load(W[out_start:out_end, in_start:in_end, :, :])
+
+                    #apply the kernel
+                    for kh in nl.affine_range(filter_height):
+                        for kw in nl.affine_range(filter_width):
+                            weights = nl.copy(weight_block[:, :, kh, kw])
+                            inputs = nl.load(X[b,in_start:in_end,h+kh,kw:kw+out_width])
+
+                            sum += nl.matmul(weights,inputs)
+
+                result = nl.copy(sum, dtype=nl.float32)
+                result = nl.add(result, bias_tile)
+                result = nl.copy(result, dtype=X.dtype)
+                nl.store(X_out[b, out_start:out_end, h, :], value=result)
+        
     return X_out
 
