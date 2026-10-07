@@ -1,4 +1,7 @@
 import jax
+import time
+import matplotlib.pyplot as plt
+from pathlib import Path
 import jax.numpy as jnp
 from jax import jit
 import torch.nn.functional as F
@@ -100,3 +103,75 @@ if __name__ == "__main__":
     conv_ref = F.conv2d(x_torch, model.weight, model.bias, stride=1, padding=1)
     print("JAX --- shape check:", out_jax.shape == conv_ref.shape)
     print("JAX --- correctness check:", torch.allclose(torch.from_numpy(np.array(out_jax)), conv_ref, atol=1e-1))
+
+
+    image_path = Path("images")
+    image_path.mkdir(exist_ok=True)
+    np.random.seed(0)
+    N, C, H, W = 2, 4, 64, 64
+    out_channels = 8
+    kernel_size = 7
+
+    image_times = []
+    image_sizes = [22, 44, 66, 88]
+    for image_size in image_sizes:
+        x = jnp.array(np.random.randn(N, C, image_size, image_size), dtype=jnp.float32)
+        w = jnp.array(np.random.randn(out_channels, C, kernel_size, kernel_size), dtype=jnp.float32)
+        bias = jnp.zeros(out_channels, dtype=jnp.float32)
+
+        # Warmup includes compilation and waits for input transfers/computation.
+        out = conv2d_manual_jax_jit(x, w, bias)
+        out.block_until_ready()
+
+        times = []
+        for _ in range(5):
+            start = time.perf_counter()
+            out = conv2d_manual_jax_jit(x, w, bias)
+            out.block_until_ready()
+            elapsed = (time.perf_counter() - start) * 1000
+            times.append(elapsed)
+
+        avg = sum(times) / len(times)
+        image_times.append(avg)
+        print(f"image size - {image_size}: {avg:.3f} ms")
+
+    kernel_times = []
+    K_sizes = [3, 5, 7, 11]
+    for K_size in K_sizes:
+        x = jnp.array(np.random.randn(N, C, H, W), dtype=jnp.float32)
+        w = jnp.array(np.random.randn(out_channels, C, K_size, K_size), dtype=jnp.float32)
+        bias = jnp.zeros(out_channels, dtype=jnp.float32)
+
+        # Warmup
+        out = conv2d_manual_jax_jit(x, w, bias)
+        out.block_until_ready()
+
+        times = []
+        for _ in range(5):
+            start = time.perf_counter()
+            out = conv2d_manual_jax_jit(x, w, bias)
+            out.block_until_ready()
+            elapsed = (time.perf_counter() - start) * 1000
+            times.append(elapsed)
+
+        avg = sum(times) / len(times)
+        kernel_times.append(avg)
+        print(f"kernel size - {K_size}: {avg:.3f} ms")
+
+    fig, axes = plt.subplots(1, 2, figsize=(10, 4))
+
+    for ax, sizes, times, parameter in [
+        (axes[0], image_sizes, image_times, "Image"),
+        (axes[1], K_sizes, kernel_times, "Kernel"),
+    ]:
+        ax.plot(sizes, times, marker="o")
+        ax.set_title(f"Varying {parameter.lower()} size")
+        ax.set_xlabel(f"{parameter} side length (pixels)")
+        ax.set_ylabel("Mean wall time per call (ms)")
+        ax.set_xticks(sizes)
+        ax.set_ylim(bottom=0)
+        ax.grid(True, alpha=0.3)
+
+    fig.suptitle("JAX JIT")
+    fig.tight_layout()
+    fig.savefig(image_path / "jax_timings.png")
