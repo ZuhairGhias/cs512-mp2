@@ -1,0 +1,21 @@
+{
+    "configurations": [
+        {
+            "name": "Linux",
+            "includePath": [
+                "${workspaceFolder}/gpu",
+                "/usr/include/python3.12",
+                "${workspaceFolder}/.venv/lib/python3.12/site-packages/torch/include",
+                "${workspaceFolder}/.venv/lib/python3.12/site-packages/torch/include/torch/csrc/api/include",
+                "${workspaceFolder}/.venv/lib/python3.12/site-packages/nvidia/cu13/include",
+                "${workspaceFolder}/.venv/lib/python3.12/site-packages/nvidia/cu13/include/cccl"
+            ],
+            "defines": ["__CUDACC__"],
+            "compilerPath": "/usr/bin/g++",
+            "cStandard": "gnu17",
+            "cppStandard": "gnu++17",
+            "intelliSenseMode": "linux-gcc-x64"
+        }
+    ],
+    "version": 4
+}
