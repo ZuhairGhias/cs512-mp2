@@ -28,7 +28,6 @@ __global__ void gemm_gpu_o4_kernel(
 
     int M = C_out;
     int L = out_h * out_w;
-    int K = C_in * KH * KW;
 
     int n = blockIdx.z;
 
