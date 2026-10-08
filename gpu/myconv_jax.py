@@ -27,20 +27,21 @@ def im2col_manual_jax(x, KH, KW, S, P, out_h, out_w):
     # TO DO: Convert input (x) into shape (N, out_h*out_w, C*KH*KW). 
     # Refer to Lecture 3 for implementing this operation.
 
-    patches = jnp.zeros((N, out_h * out_w, C * KH * KW), dtype=x.dtype)
+    patches = []
 
-    for h in range(out_h):
-        for w in range(out_w):
+    for kh in range(KH):
+        for kw in range(KW):
             patch = x_pad[
                 :, # the whole batch
                 :, # all colors
-                h*S:h*S+KH,
-                w*S:w*S+KW
+                kh:kh + out_h * S:S,
+                kw:kw + out_w * S:S,
             ]
+            patches.append(patch)
 
-            patches = patches.at[:, h*out_w + w, :].set(patch.reshape(N, C * KH * KW))
-                    
-    return patches
+    patches = jnp.stack(patches, axis=-1)
+
+    return patches.transpose(0,2,3,1,4).reshape(N, out_h * out_w, C * KH * KW)
 
 
 def conv2d_manual_jax(x, weight, bias, stride=1, padding=1):
